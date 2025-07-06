@@ -1,0 +1,6 @@
+
+services:
+  - type: worker
+    name: telegram-trading-bot
+    env: docker
+    plan: free
