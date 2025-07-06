@@ -1,4 +1,4 @@
-pybit==1.1.0
+pybit==2.0.0
 pandas
 telebot
 ta
