@@ -2,7 +2,7 @@ import time
 import traceback
 import pandas as pd
 from telegram import Bot
-from pybit import usdt_perpetual
+from pybit import HTTP
 from ta.trend import EMAIndicator, MACD
 from ta.momentum import RSIIndicator
 from ta.volatility import AverageTrueRange
