@@ -9,7 +9,7 @@ from ta.volatility import AverageTrueRange
 import config
 
 bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
-session = usdt_perpetual.HTTP("https://api.bybit.com")
+session = HTTP("https://api.bybit.com")  # Исправлено здесь
 
 def get_symbols():
     try:
