@@ -90,7 +90,7 @@ def send_signal(symbol, direction, confidence, price):
         msg = f"📈 Сигнал на {direction.upper()}
 Пара: {symbol}
 Цена входа: {price}
-Уверенность: {confidence}%"
+Уверенность: {confidence}%")
         print(f"Отправка сигнала: {msg}")
         bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=msg)
     except Exception as e:
