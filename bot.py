@@ -1,41 +1,70 @@
 import time
-import traceback
+import requests
 import pandas as pd
 from telegram import Bot
-from pybit import HTTP
 from ta.trend import EMAIndicator, MACD
 from ta.momentum import RSIIndicator
 from ta.volatility import AverageTrueRange
 import config
+import traceback
 
 bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
-session = HTTP("https://api.bybit.com")  # Исправлено здесь
+
+BASE_URL = "https://api.bybit.com"  # Основной API Bybit
 
 def get_symbols():
+    """
+    Получаем список символов USDT спотов (линейных)
+    """
     try:
-        info = session.query_symbol()
-        symbols = [s['name'] for s in info['result'] if s['quote_currency'] == 'USDT']
-        print(f"✅ Получено {len(symbols)} пар через pybit")
-        return symbols
+        url = f"{BASE_URL}/v5/market/instruments?category=linear"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        # Проверяем структуру и фильтруем USDT пары
+        if "result" in data and "list" in data["result"]:
+            symbols = [item["symbol"] for item in data["result"]["list"] if item["symbol"].endswith("USDT")]
+            print(f"✅ Получено {len(symbols)} торговых пар для анализа")
+            return symbols
+        else:
+            print("❌ Нет списка торговых пар в ответе API")
+            return []
+
     except Exception as e:
-        print("❌ Ошибка get_symbols:", e)
+        print(f"❌ Ошибка при получении символов: {e}")
         traceback.print_exc()
         return []
 
 def get_klines(symbol):
+    """
+    Получаем свечи 15 минут по символу
+    """
     try:
-        resp = session.query_kline(symbol=symbol, interval="15", limit=100)
-        data = resp['result']
-        df = pd.DataFrame(data)
-        for col in ['open', 'high', 'low', 'close', 'volume']:
-            df[col] = df[col].astype(float)
-        return df
+        url = f"{BASE_URL}/v5/market/kline?category=linear&symbol={symbol}&interval=15&limit=100"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if "result" in data and "list" in data["result"]:
+            klines = data["result"]["list"]
+            df = pd.DataFrame(klines, columns=["timestamp","open","high","low","close","volume","_","_","_","_","_","_"])
+            for col in ["open","high","low","close","volume"]:
+                df[col] = df[col].astype(float)
+            return df
+        else:
+            print(f"❌ Нет данных по свечам для {symbol}")
+            return None
+
     except Exception as e:
-        print(f"❌ Ошибка get_klines {symbol}:", e)
+        print(f"❌ Ошибка при получении свечей {symbol}: {e}")
         traceback.print_exc()
         return None
 
 def analyze(df):
+    """
+    Анализируем технические индикаторы и считаем уверенность сигнала
+    """
     try:
         df["rsi"] = RSIIndicator(df["close"]).rsi()
         macd = MACD(df["close"])
@@ -44,7 +73,7 @@ def analyze(df):
         df["ema_9"] = EMAIndicator(df["close"], window=9).ema_indicator()
         df["ema_21"] = EMAIndicator(df["close"], window=21).ema_indicator()
         df["ema_50"] = EMAIndicator(df["close"], window=50).ema_indicator()
-        df["atr"] = AverageTrueRange(high=df["high"], low=df["low"], close=df["close"]).average_true_range()
+        df["atr"] = AverageTrueRange(df["high"], df["low"], df["close"]).average_true_range()
 
         rsi = df["rsi"].iloc[-1]
         macd_val = df["macd"].iloc[-1]
@@ -58,7 +87,9 @@ def analyze(df):
         confidence = 0
         direction = None
 
+        # Проверяем ATR - волатильность
         if atr > avg_price * 0.005:
+            # RSI - покупка или продажа
             if rsi > 60:
                 confidence += 20
                 direction = "long"
@@ -66,11 +97,13 @@ def analyze(df):
                 confidence += 20
                 direction = "short"
 
+            # MACD подтверждение
             if macd_val > macd_signal and direction == "long":
                 confidence += 25
             elif macd_val < macd_signal and direction == "short":
                 confidence += 25
 
+            # EMA тренд
             if ema_9 > ema_21 > ema_50 and direction == "long":
                 confidence += 30
             elif ema_9 < ema_21 < ema_50 and direction == "short":
@@ -79,73 +112,78 @@ def analyze(df):
             if direction:
                 confidence += min(25, (atr / avg_price) * 1000)
 
-        return (direction, int(confidence)) if confidence >= config.CONFIDENCE_THRESHOLD else (None, int(confidence))
+        if confidence >= config.CONFIDENCE_THRESHOLD:
+            return direction, int(confidence)
+        else:
+            return None, int(confidence)
+
     except Exception as e:
-        print(f"Ошибка в анализе данных: {e}")
+        print(f"❌ Ошибка анализа: {e}")
         traceback.print_exc()
         return None, 0
 
 def send_signal(symbol, direction, confidence, price):
     try:
         msg = (
-            f"📈 Сигнал на {direction.upper()}\n"
+            f"📈 Сигнал: {direction.upper()}\n"
             f"Пара: {symbol}\n"
-            f"Цена входа: {price}\n"
+            f"Цена входа: {price:.6f}\n"
             f"Уверенность: {confidence}%"
         )
-        print(f"Отправка сигнала: {msg}")
+        print(f"🔔 Отправка сигнала: {msg}")
         bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=msg)
     except Exception as e:
-        print(f"Ошибка при отправке сигнала: {e}")
+        print(f"❌ Ошибка отправки сигнала: {e}")
         traceback.print_exc()
 
 def main():
-    last_report_time = time.time()
-    print("Бот запущен, начинаем работу.")
+    print("🚀 Бот запущен")
     try:
-        bot.send_message(config.TELEGRAM_CHAT_ID, text="✅ Бот успешно запущен и готов к работе.")
+        bot.send_message(config.TELEGRAM_CHAT_ID, "✅ Бот запущен и готов к работе")
     except Exception as e:
-        print(f"Ошибка при отправке приветственного сообщения: {e}")
-        traceback.print_exc()
+        print(f"❌ Ошибка приветственного сообщения: {e}")
+
+    last_ping = time.time()
 
     while True:
         try:
             symbols = get_symbols()
             if not symbols:
-                print("Нет пар для анализа, подождём минуту.")
+                print("⚠️ Нет пар, ждем минуту")
                 time.sleep(60)
                 continue
 
-            best = None
             best_confidence = 0
+            best_signal = None
 
             for symbol in symbols:
                 df = get_klines(symbol)
                 if df is None or df.empty:
-                    print(f"Нет данных по {symbol}, пропускаем.")
                     continue
 
                 direction, confidence = analyze(df)
-                print(f"{symbol}: направление={direction}, уверенность={confidence}%")
+                print(f"{symbol}: {direction}, уверенность {confidence}%")
 
-                if direction and confidence >= config.CONFIDENCE_THRESHOLD:
+                if direction:
                     price = df["close"].iloc[-1]
                     send_signal(symbol, direction, confidence, price)
 
                 if confidence > best_confidence:
-                    best = (symbol, direction, confidence)
                     best_confidence = confidence
+                    best_signal = (symbol, direction, confidence)
 
-            if best:
-                print(f"🔥 Лучшая пара: {best[0]} | Направление: {best[1]} | Уверенность: {best[2]}%")
+            if best_signal:
+                print(f"🔥 Лучший сигнал: {best_signal[0]} {best_signal[1]} {best_signal[2]}%")
 
-            if time.time() - last_report_time > 3600:
-                bot.send_message(config.TELEGRAM_CHAT_ID, text="⌛️ Бот работает.")
-                last_report_time = time.time()
+            if time.time() - last_ping > 3600:
+                bot.send_message(config.TELEGRAM_CHAT_ID, "⌛️ Бот жив и работает")
+                last_ping = time.time()
 
+            print("⏳ Ждем 5 минут")
             time.sleep(300)
+
         except Exception as e:
-            print(f"Ошибка в основном цикле: {e}")
+            print(f"❌ Ошибка в основном цикле: {e}")
             traceback.print_exc()
             time.sleep(60)
 
