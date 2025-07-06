@@ -12,11 +12,13 @@ bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
 
 def get_symbols():
     try:
-        url = "https://api.bybit.com/v5/market/instruments?category=linear"
+        url = "https://api.bybit.com/contract/v3/public/instruments"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        symbols = [item["symbol"] for item in data["result"]["list"] if item["symbol"].endswith("USDT")]
+        instruments = data.get("result", {}).get("list", [])
+        # Фильтруем только инструменты с quote_currency == "USDT"
+        symbols = [item["symbol"] for item in instruments if item.get("quote_currency") == "USDT"]
         print(f"Получено {len(symbols)} символов для анализа.")
         return symbols
     except Exception as e:
@@ -26,12 +28,18 @@ def get_symbols():
 
 def get_klines(symbol):
     try:
-        url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={symbol}&interval=15&limit=100"
+        url = f"https://api.bybit.com/contract/v3/public/kline/list?symbol={symbol}&interval=15&limit=100"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        data = response.json()["result"]["list"]
-        df = pd.DataFrame(data, columns=["timestamp", "open", "high", "low", "close", "volume", "_", "_", "_", "_", "_", "_"])
-        df = df.astype({"close": float, "high": float, "low": float, "volume": float})
+        data = response.json()
+        kline_list = data.get("result", {}).get("list", [])
+        if not kline_list:
+            print(f"Нет свечей для {symbol}")
+            return None
+        df = pd.DataFrame(kline_list)
+        # Приводим нужные столбцы к float
+        for col in ["open", "high", "low", "close", "volume"]:
+            df[col] = df[col].astype(float)
         return df
     except Exception as e:
         print(f"Ошибка при получении свечей для {symbol}: {e}")
