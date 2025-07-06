@@ -87,10 +87,12 @@ def analyze(df):
 
 def send_signal(symbol, direction, confidence, price):
     try:
-        msg = f"📈 Сигнал на {direction.upper()}
-Пара: {symbol}
-Цена входа: {price}
-Уверенность: {confidence}%")
+        msg = (
+            f"📈 Сигнал на {direction.upper()}\n"
+            f"Пара: {symbol}\n"
+            f"Цена входа: {price}\n"
+            f"Уверенность: {confidence}%"
+        )
         print(f"Отправка сигнала: {msg}")
         bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=msg)
     except Exception as e:
@@ -110,6 +112,7 @@ def main():
         try:
             symbols = get_symbols()
             if not symbols:
+                print("Нет пар для анализа, подождём минуту.")
                 time.sleep(60)
                 continue
 
@@ -119,12 +122,16 @@ def main():
             for symbol in symbols:
                 df = get_klines(symbol)
                 if df is None or df.empty:
+                    print(f"Нет данных по {symbol}, пропускаем.")
                     continue
+
                 direction, confidence = analyze(df)
                 print(f"{symbol}: направление={direction}, уверенность={confidence}%")
+
                 if direction and confidence >= config.CONFIDENCE_THRESHOLD:
                     price = df["close"].iloc[-1]
                     send_signal(symbol, direction, confidence, price)
+
                 if confidence > best_confidence:
                     best = (symbol, direction, confidence)
                     best_confidence = confidence
@@ -133,7 +140,7 @@ def main():
                 print(f"🔥 Лучшая пара: {best[0]} | Направление: {best[1]} | Уверенность: {best[2]}%")
 
             if time.time() - last_report_time > 3600:
-                bot.send_message(config.TELEGRAM_CHAT_ID, text="⌛ Бот работает.")
+                bot.send_message(config.TELEGRAM_CHAT_ID, text="⌛️ Бот работает.")
                 last_report_time = time.time()
 
             time.sleep(300)
