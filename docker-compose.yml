@@ -1,12 +1,11 @@
-version: '3.9'
-
+version: '3.8'
 services:
-  telegram-futures-bot:
+  futuresbot:
     build: .
-    container_name: telegram_futures_bot
-    restart: always
-    ports:
-      - "8080:8080"
     environment:
       - TELEGRAM_TOKEN=8038741822:AAGWnN0s24X8YK9fzd8DiNLz781ZWkdu-oM
       - CHAT_ID=379291385
+    volumes:
+      - ./models:/app/models
+      - ./market_data:/app/market_data
+    restart: always
