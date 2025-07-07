@@ -8,5 +8,5 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - TELEGRAM_TOKEN=your_token_here
-      - CHAT_ID=your_chat_id_here
+      - TELEGRAM_TOKEN=8038741822:AAGWnN0s24X8YK9fzd8DiNLz781ZWkdu-oM
+      - CHAT_ID=379291385
