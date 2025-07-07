@@ -1,6 +1,0 @@
-pybit==2.0.0
-pandas
-telebot
-ta
-python-telegram-bot==13.15
-requests
