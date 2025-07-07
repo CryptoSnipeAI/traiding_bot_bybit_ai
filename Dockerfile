@@ -1,17 +1,14 @@
-# Используем официальный Python 3.9 образ
-FROM python:3.9-slim
+FROM python:3.10-slim
 
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем все файлы в контейнер
-COPY . .
+COPY . /app
 
-# Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && \
+    apt-get install -y build-essential libffi-dev libssl-dev libta-lib0 libta-lib0-dev && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Указываем порт для Flask
-EXPOSE 8080
+ENV TELEGRAM_TOKEN=your_token
+ENV CHAT_ID=your_chat_id
 
-# Команда запуска бота
 CMD ["python", "bot.py"]
