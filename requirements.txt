@@ -1,6 +1,5 @@
 requests
-pandas
-ta-lib
+pandas_ta
 xgboost
 scikit-learn
 python-telegram-bot==13.15
