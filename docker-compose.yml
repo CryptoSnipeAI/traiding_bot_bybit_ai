@@ -1,0 +1,12 @@
+version: '3.9'
+
+services:
+  telegram-futures-bot:
+    build: .
+    container_name: telegram_futures_bot
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - TELEGRAM_TOKEN=your_token_here
+      - CHAT_ID=your_chat_id_here
