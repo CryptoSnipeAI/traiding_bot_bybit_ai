@@ -3,7 +3,7 @@ services:
   futuresbot:
     build: .
     environment:
-      - TELEGRAM_TOKEN=8038741822:AAGWnN0s24X8YK9fzd8DiNLz781ZWkdu-oM
+      - TELEGRAM_TOKEN=7982722364:AAF-G_vgZJXv2L-f6KJSxo1h3xd1wuMgrww
       - CHAT_ID=379291385
     volumes:
       - ./models:/app/models
