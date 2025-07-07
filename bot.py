@@ -6,10 +6,14 @@ from features import prepare
 from telegram import Bot
 from telegram.ext import Updater, CommandHandler
 from apscheduler.schedulers.background import BackgroundScheduler
+from pytz import utc
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 MODELS_DIR = "models"
+
+if not TELEGRAM_TOKEN or not CHAT_ID:
+    raise ValueError("TELEGRAM_TOKEN and CHAT_ID must be set as environment variables.")
 
 def analyze(symbol, model):
     df = get_klines(symbol, limit=500)
@@ -20,15 +24,16 @@ def analyze(symbol, model):
     entry = df['close'].iloc[-1]
     sl = entry * (0.995 if pred else 1.005)
     tp = entry * (1.01 if pred else 0.99)
-    return f"{symbol}\n{'LONG' if pred else 'SHORT'} @ {entry:.2f}\nSL {sl:.2f} / TP {tp:.2f}\nConf: {prob*100:.1f}%"
+    direction = "LONG" if pred else "SHORT"
+    return f"{symbol}\n{direction} @ {entry:.2f}\nSL {sl:.2f} / TP {tp:.2f}\nConf: {prob*100:.1f}%"
 
 def send_signals():
     bot = Bot(token=TELEGRAM_TOKEN)
     for filename in os.listdir(MODELS_DIR):
         if filename.endswith(".pkl"):
             symbol = filename.replace("_xgb.pkl", "")
-            model = joblib.load(os.path.join(MODELS_DIR, filename))
             try:
+                model = joblib.load(os.path.join(MODELS_DIR, filename))
                 msg = analyze(symbol, model)
                 bot.send_message(chat_id=CHAT_ID, text=msg)
             except Exception as e:
@@ -42,9 +47,11 @@ def main():
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("signal", signal_cmd))
     updater.start_polling()
-    scheduler = BackgroundScheduler()
+
+    scheduler = BackgroundScheduler(timezone=utc)
     scheduler.add_job(send_signals, 'interval', minutes=15)
     scheduler.start()
+
     updater.idle()
 
 if __name__ == "__main__":
