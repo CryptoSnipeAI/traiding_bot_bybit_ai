@@ -1,8 +1,9 @@
-requests
-pandas_ta
-pandas
+pandas==1.5.3
+numpy==1.23.5
+pandas_ta==0.3.14b0
 xgboost
 scikit-learn
-python-telegram-bot==13.15
-apscheduler
 joblib
+requests
+apscheduler
+python-telegram-bot==13.15
