@@ -19,3 +19,11 @@ def get_all_symbols():
     url = "https://api.bybit.com/v5/market/instruments-info"
     resp = requests.get(url, params={"category": "linear"}).json()
     return [item["symbol"] for item in resp["result"]["list"] if item["status"] == "Trading"]
+
+def get_price(symbol):
+    url = "https://api.bybit.com/v5/market/tickers?category=linear"
+    res = requests.get(url).json()
+    for item in res["result"]["list"]:
+        if item["symbol"] == symbol:
+            return float(item["lastPrice"])
+    raise ValueError(f"❌ Price not found for {symbol}")
