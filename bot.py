@@ -10,7 +10,6 @@ from pytz import utc
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-MODELS_DIR = "models"
 
 if not TELEGRAM_TOKEN or not CHAT_ID:
     raise ValueError("TELEGRAM_TOKEN and CHAT_ID must be set as environment variables.")
@@ -29,15 +28,12 @@ def analyze(symbol, model):
 
 def send_signals():
     bot = Bot(token=TELEGRAM_TOKEN)
-    for filename in os.listdir(MODELS_DIR):
-        if filename.endswith(".pkl"):
-            symbol = filename.replace("_xgb.pkl", "")
-            try:
-                model = joblib.load(os.path.join(MODELS_DIR, filename))
-                msg = analyze(symbol, model)
-                bot.send_message(chat_id=CHAT_ID, text=msg)
-            except Exception as e:
-                print(f"Error with {symbol}: {e}")
+    try:
+        model = joblib.load("model.pkl")  # Загружаем одну модель
+        msg = analyze("BTCUSDT", model)   # Укажи нужный символ здесь
+        bot.send_message(chat_id=CHAT_ID, text=msg)
+    except Exception as e:
+        print(f"Error: {e}")
 
 def signal_cmd(update, context):
     send_signals()
