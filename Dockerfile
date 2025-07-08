@@ -22,4 +22,4 @@ ENV TELEGRAM_TOKEN=your_token
 ENV CHAT_ID=your_chat_id
 
 # Запуск бота
-CMD ["bash", "-c", "python train_model_bybit.py && python bot.py"]
+CMD ["bash", "-c", "python train_model.py && python bot.py"]
