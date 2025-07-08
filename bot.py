@@ -1,18 +1,16 @@
 import os
 import joblib
-import pandas as pd
 from data_fetch import get_klines
 from features import prepare
-from telegram import Bot
-from telegram.ext import Updater, CommandHandler
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import utc
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-if not TELEGRAM_TOKEN or not CHAT_ID:
-    raise ValueError("TELEGRAM_TOKEN and CHAT_ID must be set as environment variables.")
+model = joblib.load("model.pkl")
 
 def analyze(symbol, model):
     df = get_klines(symbol, limit=500)
@@ -26,29 +24,27 @@ def analyze(symbol, model):
     direction = "LONG" if pred else "SHORT"
     return f"{symbol}\n{direction} @ {entry:.2f}\nSL {sl:.2f} / TP {tp:.2f}\nConf: {prob*100:.1f}%"
 
-def send_signals():
-    bot = Bot(token=TELEGRAM_TOKEN)
-    try:
-        model = joblib.load("model.pkl")  # Загружаем одну модель
-        msg = analyze("BTCUSDT", model)   # Укажи нужный символ здесь
-        bot.send_message(chat_id=CHAT_ID, text=msg)
-    except Exception as e:
-        print(f"Error: {e}")
+async def signal_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = analyze("BTCUSDT", model)
+    await update.message.reply_text(msg)
 
-def signal_cmd(update, context):
-    send_signals()
+def send_auto_signal():
+    from telegram import Bot
+    bot = Bot(token=TELEGRAM_TOKEN)
+    msg = analyze("BTCUSDT", model)
+    bot.send_message(chat_id=CHAT_ID, text=msg)
 
 def main():
-    updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("signal", signal_cmd))
-    updater.start_polling()
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("signal", signal_cmd))
 
     scheduler = BackgroundScheduler(timezone=utc)
-    scheduler.add_job(send_signals, 'interval', minutes=15)
+    scheduler.add_job(send_auto_signal, 'interval', minutes=15)
     scheduler.start()
 
-    updater.idle()
+    print("✅ Bot started")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
+    
