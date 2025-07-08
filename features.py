@@ -1,14 +1,20 @@
+# features.py
 import pandas as pd
-import pandas_ta as ta
+import ta
 
-def prepare(df):
-    df['rsi'] = ta.rsi(df['close'], length=14)
-    df['atr'] = ta.atr(df['high'], df['low'], df['close'], length=14)
-    df['ma50'] = ta.sma(df['close'], length=50)
-    df['ma200'] = ta.sma(df['close'], length=200)
-    df['future_close'] = df['close'].shift(-3)
-    df['target'] = (df['future_close'] > df['close'] * 1.005).astype(int)
+def prepare(df: pd.DataFrame):
+    df = df.copy()
+
+    df['rsi'] = ta.momentum.RSIIndicator(df['close']).rsi()
+    macd = ta.trend.MACD(df['close'])
+    df['macd'] = macd.macd_diff()
+    df['ema'] = ta.trend.EMAIndicator(df['close']).ema_indicator()
+    bb = ta.volatility.BollingerBands(df['close'])
+    df['bb_width'] = bb.bollinger_wband()
+    df['adx'] = ta.trend.ADXIndicator(df['high'], df['low'], df['close']).adx()
+    df['volatility'] = df['high'] - df['low']
+
     df = df.dropna()
-    X = df[['rsi', 'atr', 'ma50', 'ma200']].copy()
-    y = df['target'].copy()
+    X = df[['rsi', 'macd', 'ema', 'bb_width', 'adx', 'volatility']]
+    y = df['target'] if 'target' in df else None
     return X, y
