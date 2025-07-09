@@ -3,7 +3,9 @@ import numpy as np
 import joblib
 import xgboost as xgb
 import requests
-from features import prepare_features
+from ta.momentum import RSIIndicator, StochRSIIndicator
+from ta.trend import EMAIndicator, MACD
+from ta.volatility import AverageTrueRange
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -26,6 +28,24 @@ def get_klines(symbol, interval="15", limit=500):
     df = df.astype(float)
     return df
 
+def prepare_features(df):
+    df["rsi"] = RSIIndicator(close=df["close"], window=14).rsi()
+    df["stoch_rsi"] = StochRSIIndicator(close=df["close"]).stochrsi_k()
+    df["ema20"] = EMAIndicator(close=df["close"], window=20).ema_indicator()
+    df["ema50"] = EMAIndicator(close=df["close"], window=50).ema_indicator()
+    macd = MACD(close=df["close"])
+    df["macd"] = macd.macd()
+    df["macd_signal"] = macd.macd_signal()
+    df["atr"] = AverageTrueRange(high=df["high"], low=df["low"], close=df["close"]).average_true_range()
+    df["volatility"] = (df["high"] - df["low"]) / df["close"]
+    df["candle_size"] = (df["close"] - df["open"]) / df["open"]
+    df["upper_shadow"] = (df["high"] - df[["close", "open"]].max(axis=1)) / df["close"]
+    df["lower_shadow"] = (df[["close", "open"]].min(axis=1) - df["low"]) / df["close"]
+    df["volume_ratio"] = df["volume"] / df["volume"].rolling(window=10).mean()
+    df["ema_diff"] = (df["ema20"] - df["ema50"]) / df["close"]
+    df = df.dropna()
+    return df
+
 def prepare_target(df, profit_threshold_low=0.01, profit_threshold_high=0.03, forward=3):
     df["future_max"] = df["close"].shift(-forward).rolling(forward).max()
     df["return"] = (df["future_max"] - df["close"]) / df["close"]
@@ -38,14 +58,15 @@ all_X, all_y = [], []
 for symbol in TOP_SYMBOLS:
     try:
         df = get_klines(symbol)
+        df.columns = ["timestamp", "open", "high", "low", "close", "volume", "turnover"]
+        df = prepare_features(df)
         df = prepare_target(df)
-        df, _ = prepare_features(df)
-
-        # 🔥 Используем все 15 признаков автоматически
-        feature_cols = [col for col in df.columns if col not in ['timestamp', 'open', 'high', 'low', 'turnover', 'future_max', 'return', 'target']]
-        X = df[feature_cols]
+        X = df[[
+            "rsi", "stoch_rsi", "ema20", "ema50", "macd", "macd_signal", "atr",
+            "volatility", "candle_size", "upper_shadow", "lower_shadow",
+            "volume_ratio", "ema_diff", "volume", "close"
+        ]]
         y = df["target"]
-
         all_X.append(X)
         all_y.append(y)
         print(f"✅ {symbol} готов")
@@ -55,7 +76,15 @@ for symbol in TOP_SYMBOLS:
 X_all = pd.concat(all_X, ignore_index=True)
 y_all = pd.concat(all_y, ignore_index=True)
 
-model = xgb.XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, use_label_encoder=False, eval_metric="logloss")
+print(f"🧠 Обучаем модель на {X_all.shape[0]} примерах с {X_all.shape[1]} признаками...")
+
+model = xgb.XGBClassifier(
+    n_estimators=150,
+    max_depth=6,
+    learning_rate=0.05,
+    use_label_encoder=False,
+    eval_metric="logloss"
+)
 model.fit(X_all, y_all)
 
 joblib.dump(model, "model.pkl")
