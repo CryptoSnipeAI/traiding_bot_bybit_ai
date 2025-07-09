@@ -1,20 +1,18 @@
 # features.py
-import pandas as pd
-import ta
+from ta.momentum import RSIIndicator, StochRSIIndicator
+from ta.trend import EMAIndicator, MACD
+from ta.volatility import AverageTrueRange
 
-def prepare(df: pd.DataFrame):
-    df = df.copy()
-
-    df['rsi'] = ta.momentum.RSIIndicator(df['close']).rsi()
-    macd = ta.trend.MACD(df['close'])
-    df['macd'] = macd.macd_diff()
-    df['ema'] = ta.trend.EMAIndicator(df['close']).ema_indicator()
-    bb = ta.volatility.BollingerBands(df['close'])
-    df['bb_width'] = bb.bollinger_wband()
-    df['adx'] = ta.trend.ADXIndicator(df['high'], df['low'], df['close']).adx()
-    df['volatility'] = df['high'] - df['low']
-
+def prepare_features(df):
+    df["rsi"] = RSIIndicator(close=df["close"], window=14).rsi()
+    df["stoch_rsi"] = StochRSIIndicator(close=df["close"]).stochrsi_k()
+    df["ema20"] = EMAIndicator(close=df["close"], window=20).ema_indicator()
+    df["ema50"] = EMAIndicator(close=df["close"], window=50).ema_indicator()
+    macd = MACD(close=df["close"])
+    df["macd"] = macd.macd()
+    df["macd_signal"] = macd.macd_signal()
+    df["atr"] = AverageTrueRange(high=df["high"], low=df["low"], close=df["close"]).average_true_range()
+    df["volatility"] = (df["high"] - df["low"]) / df["close"]
     df = df.dropna()
-    X = df[['rsi', 'macd', 'ema', 'bb_width', 'adx', 'volatility']]
-    y = df['target'] if 'target' in df else None
-    return X, y
+    return df, None
+
