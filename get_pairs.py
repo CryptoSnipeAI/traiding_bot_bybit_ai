@@ -1,22 +1,30 @@
 # get_pairs.py
-import requests
+import os
+import joblib
+import pandas as pd
+from data_fetch import get_klines
+from features import prepare
+from xgboost import XGBClassifier
+from get_pairs import get_top_pairs
 
-def get_top_pairs(min_volume_usdt=10000000):
-    url = "https://api.bybit.com/v5/market/tickers?category=linear"
-    res = requests.get(url)
-    data = res.json()
+pairs = get_top_pairs()
 
-    if not data.get("result") or not data["result"].get("list"):
-        return []
+all_X, all_y = [], []
 
-    pairs = []
-    for item in data["result"]["list"]:
-        symbol = item["symbol"]
-        volume = float(item["turnover24h"])
-        if symbol.endswith("USDT") and "1000" not in symbol and volume >= min_volume_usdt:
-            pairs.append(symbol)
+for symbol in pairs:
+    try:
+        df = get_klines(symbol, limit=500)
+        X, y = prepare(df)
+        all_X.append(X)
+        all_y.append(y)
+        print(f"✅ {symbol} готов")
+    except Exception as e:
+        print(f"❌ {symbol} ошибка: {e}")
 
-    return pairs
+X = pd.concat(all_X)
+y = pd.concat(all_y)
 
-if __name__ == "__main__":
-    print(get_top_pairs())
+model = XGBClassifier(n_estimators=100, max_depth=3)
+model.fit(X, y)
+joblib.dump(model, "model.pkl")
+print("✅ Модель обучена и сохранена как model.pkl")
