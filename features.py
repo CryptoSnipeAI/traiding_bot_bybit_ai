@@ -1,7 +1,8 @@
 # features.py
 from ta.momentum import RSIIndicator, StochRSIIndicator
 from ta.trend import EMAIndicator, MACD
-from ta.volatility import AverageTrueRange
+from ta.volatility import AverageTrueRange, BollingerBands
+from ta.volume import OnBalanceVolume
 
 def prepare_features(df):
     df["rsi"] = RSIIndicator(close=df["close"], window=14).rsi()
@@ -12,7 +13,12 @@ def prepare_features(df):
     df["macd"] = macd.macd()
     df["macd_signal"] = macd.macd_signal()
     df["atr"] = AverageTrueRange(high=df["high"], low=df["low"], close=df["close"]).average_true_range()
+    bb = BollingerBands(close=df["close"], window=20, window_dev=2)
+    df["bb_hband"] = bb.bollinger_hband()
+    df["bb_lband"] = bb.bollinger_lband()
+    df["bb_width"] = bb.bollinger_hband_indicator()
+    df["obv"] = OnBalanceVolume(close=df["close"], volume=df["volume"]).on_balance_volume()
     df["volatility"] = (df["high"] - df["low"]) / df["close"]
     df = df.dropna()
-    return df, None
+    return df
 
