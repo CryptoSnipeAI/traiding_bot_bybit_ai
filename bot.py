@@ -1,7 +1,6 @@
 # bot.py
 import os
 import joblib
-import pandas as pd
 from data_fetch import get_klines
 from features import prepare_features as prepare
 from telegram import Update
@@ -22,8 +21,8 @@ def analyze(symbol, model):
         if df.empty:
             raise ValueError("Features are empty")
 
-        # Используем только признаки (убираем лишние колонки)
-        drop_cols = ['timestamp', 'open', 'high', 'low', 'turnover', 'future_max', 'return', 'target']
+        # Удаляем только служебные столбцы, оставляя все признаки
+        drop_cols = ['timestamp', 'future_max', 'return', 'target']
         features = [col for col in df.columns if col not in drop_cols]
 
         last = df[features].iloc[[-1]].values
