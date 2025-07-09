@@ -1,7 +1,7 @@
 # get_pairs.py
 import requests
 
-def get_top_pairs(min_volume_usdt=10000000):
+def get_top_pairs(min_volume_usdt=10_000_000):
     url = "https://api.bybit.com/v5/market/tickers?category=linear"
     res = requests.get(url)
     data = res.json()
