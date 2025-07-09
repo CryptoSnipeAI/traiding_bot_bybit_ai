@@ -37,9 +37,23 @@ def prepare_features(df):
     return df
 
 def prepare_target(df, profit_threshold_low=0.01, profit_threshold_high=0.03, forward=3):
-    df["future_max"] = df["close"].shift(-forward).rolling(forward).max()
-    df["return"] = (df["future_max"] - df["close"]) / df["close"]
-    df["target"] = ((df["return"] >= profit_threshold_low) & (df["return"] <= profit_threshold_high)).astype(int)
+    df["future_max"] = df["close"].shift(-forward).rolling(window=forward).max()
+    df["future_min"] = df["close"].shift(-forward).rolling(window=forward).min()
+    df["return_up"] = (df["future_max"] - df["close"]) / df["close"]
+    df["return_down"] = (df["close"] - df["future_min"]) / df["close"]
+
+    # Классы:
+    # 1 - цена поднимется на 1-3% за следующие 3 свечи (long сигнал)
+    # 0 - цена упадет на 1-3% (short сигнал)
+    # -1 - остальные случаи (без сигнала)
+    conditions = [
+        (df["return_up"] >= profit_threshold_low) & (df["return_up"] <= profit_threshold_high),
+        (df["return_down"] >= profit_threshold_low) & (df["return_down"] <= profit_threshold_high)
+    ]
+    choices = [1, 0]
+    df["target"] = np.select(conditions, choices, default=-1)
+
+    df = df[df["target"] != -1]  # Убираем нейтральные метки
     df = df.dropna()
     return df
 
@@ -62,7 +76,15 @@ for symbol in TOP_SYMBOLS:
 X_all = pd.concat(all_X, ignore_index=True)
 y_all = pd.concat(all_y, ignore_index=True)
 
-model = xgb.XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, use_label_encoder=False, eval_metric="logloss")
+model = xgb.XGBClassifier(
+    n_estimators=150,
+    max_depth=5,
+    learning_rate=0.1,
+    use_label_encoder=False,
+    eval_metric="logloss",
+    random_state=42
+)
+
 model.fit(X_all, y_all)
 
 joblib.dump(model, "model.pkl")
