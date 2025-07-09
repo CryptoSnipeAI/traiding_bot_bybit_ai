@@ -18,10 +18,15 @@ model = joblib.load("model.pkl")
 def analyze(symbol, model):
     try:
         df = get_klines(symbol, limit=500)
-        X, _ = prepare(df)  # ✅ исправили: теперь unpack tuple
-        if X.empty:
+        df, _ = prepare(df)
+        if df.empty:
             raise ValueError("Features are empty")
-        last = X.iloc[[-1]].values
+
+        # Используем только признаки (убираем лишние колонки)
+        drop_cols = ['timestamp', 'open', 'high', 'low', 'turnover', 'future_max', 'return', 'target']
+        features = [col for col in df.columns if col not in drop_cols]
+
+        last = df[features].iloc[[-1]].values
         pred = model.predict(last)[0]
         prob = model.predict_proba(last)[0][pred]
         entry = df['close'].iloc[-1]
