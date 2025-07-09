@@ -3,7 +3,7 @@ import os
 import joblib
 import pandas as pd
 from data_fetch import get_klines
-from features import prepare
+from features import prepare_features as prepare
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from apscheduler.schedulers.background import BackgroundScheduler
