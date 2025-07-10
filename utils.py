@@ -4,11 +4,15 @@ import time
 
 def fetch_klines(symbol, interval='15m', limit=200):
     url = "https://api.bybit.com/v5/market/kline"
+    
+    end = int(time.time() * 1000)  # текущий timestamp в миллисекундах
+
     params = {
-        "category": "linear",  # Для фьючерсов
+        "category": "linear",
         "symbol": symbol,
-        "interval": interval,  # <-- ОБЯЗАТЕЛЬНО с "m" (например '15m')
-        "limit": limit
+        "interval": interval,
+        "limit": limit,
+        "end": end
     }
 
     try:
