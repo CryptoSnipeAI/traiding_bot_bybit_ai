@@ -1,65 +1,51 @@
-import pandas as pd
-import joblib
 import os
-from data_fetch import get_klines
+import pickle
+import pandas as pd
 from features import prepare_features
+from utils import fetch_klines
+from sklearn.ensemble import RandomForestClassifier
 
-# Путь для сохранения модели
-MODEL_PATH = "model.pkl"
-
-# Список тикеров (можно изменить на top 20 или все доступные)
-tickers = [
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT",
-    "AVAXUSDT", "DOTUSDT", "MATICUSDT", "LTCUSDT", "TRXUSDT", "LINKUSDT", "BCHUSDT",
-    "XLMUSDT", "ATOMUSDT", "ETCUSDT", "FILUSDT", "ICPUSDT", "HBARUSDT"
+symbols = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "MATICUSDT",
+    "LTCUSDT", "TRXUSDT", "LINKUSDT", "BCHUSDT", "XLMUSDT",
+    "ATOMUSDT", "ETCUSDT", "FILUSDT", "ICPUSDT", "HBARUSDT"
 ]
 
-all_X = []
-all_y = []
+data = []
 
-for symbol in tickers:
+for symbol in symbols:
+    print(f"✅ Загружаю {symbol}")
     try:
-        print(f"✅ Загружаю {symbol}")
-        df = get_klines(symbol=symbol, interval="15m", limit=300)
-        df = prepare_features(df)
+        df = fetch_klines(symbol, interval='15m', limit=1500)
 
-        # Проверка: все признаки на месте
-        expected_features = [
-            'close', 'rsi', 'stoch_k', 'stoch_d', 'macd', 'macd_signal',
-            'willr', 'cci', 'adx', 'obv', 'roc', 'atr', 'ema_9', 'ema_21',
-            'ema_50', 'ema_200', 'tema', 'trix', 'mfi', 'vwap', 'supertrend_signal'
-        ]
-
-        # Пропускаем, если есть пропуски или недостающие признаки
-        if df[expected_features].isnull().any().any():
-            print(f"⚠️ Пропускаем {symbol}: есть пропущенные значения")
+        if df is None or df.empty:
+            print(f"❌ {symbol} ошибка: пустой DataFrame")
             continue
 
-        X = df[expected_features]
-        y = df["target"]  # Целевая переменная
+        features = prepare_features(df)
 
-        all_X.append(X)
-        all_y.append(y)
+        if features is None or features.empty or len(features) < 100:
+            print(f"❌ {symbol} ошибка: недостаточно данных после обработки")
+            continue
 
-        print(f"✅ {symbol} готов")
+        data.append(features)
 
     except Exception as e:
         print(f"❌ {symbol} ошибка: {e}")
 
-# Объединяем все данные
-if not all_X or not all_y:
+if not data:
     raise ValueError("Нет данных для обучения. Все тикеры не прошли фильтр.")
 
-X_all = pd.concat(all_X, ignore_index=True)
-y_all = pd.concat(all_y, ignore_index=True)
+df_all = pd.concat(data)
 
-print("📊 Объём данных:", X_all.shape)
+X = df_all.drop(columns=['target'])
+y = df_all['target']
 
-# Обучаем модель
-from sklearn.ensemble import RandomForestClassifier
 model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_all, y_all)
+model.fit(X, y)
 
-# Сохраняем модель
-joblib.dump(model, MODEL_PATH)
-print(f"✅ Модель обучена и сохранена как {MODEL_PATH}")
+with open("model.pkl", "wb") as f:
+    pickle.dump(model, f)
+
+print("✅ Модель обучена и сохранена как model.pkl")
