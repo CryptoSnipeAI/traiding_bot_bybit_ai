@@ -6,7 +6,7 @@ def fetch_klines(symbol, interval='15', limit=200):
     url = "https://api.bybit.com/v5/market/kline"
 
     params = {
-        "category": "linear",  # это важно — именно для фьючерсов!
+        "category": "linear",  # Фьючерсы
         "symbol": symbol,
         "interval": interval,
         "limit": limit
@@ -16,26 +16,35 @@ def fetch_klines(symbol, interval='15', limit=200):
         response = requests.get(url, params=params)
         data = response.json()
 
-        if data.get("retCode") != 0 or "result" not in data or "list" not in data["result"]:
-            print(f"❌ Ошибка API: {data.get('retMsg', 'Unknown')} для {symbol}")
+        if data.get("retCode") != 0:
+            print(f"❌ API ошибка {symbol}: {data.get('retMsg', 'Unknown')}")
             return None
 
-        rows = data["result"]["list"]
-        if not rows:
+        candles = data.get("result", {}).get("list", [])
+        if not candles:
+            print(f"❌ {symbol} ошибка: пустой список свечей")
             return None
 
-        df = pd.DataFrame(rows, columns=[
-            'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'turnover', 'confirm', 'cross_seq', 'timestamp_eof'
+        df = pd.DataFrame(candles, columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'
         ])
 
-        df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
-        df = df.astype(float)
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df = df.sort_values('timestamp')
+        # Преобразуем типы данных
+        df['timestamp'] = pd.to_datetime(df['timestamp'].astype(float), unit='ms')
+        df = df.astype({
+            'open': float,
+            'high': float,
+            'low': float,
+            'close': float,
+            'volume': float,
+            'turnover': float
+        })
+
+        df.set_index('timestamp', inplace=True)
+        df = df.sort_index()
         return df
 
     except Exception as e:
-        print(f"❌ Ошибка запроса {symbol}: {e}")
+        print(f"❌ Ошибка при получении данных {symbol}: {e}")
         time.sleep(1)
         return None
