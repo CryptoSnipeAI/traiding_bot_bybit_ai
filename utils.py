@@ -2,10 +2,11 @@ import pandas as pd
 import requests
 import time
 
-def fetch_klines(symbol, interval='15m', limit=200):
+def fetch_klines(symbol, interval='15', limit=200):
     url = "https://api.bybit.com/v5/market/kline"
-    
-    end = int(time.time() * 1000)  # текущий timestamp в миллисекундах
+
+    # ⚠️ Текущее время минус 5 минут
+    end = int((time.time() - 300) * 1000)
 
     params = {
         "category": "linear",
@@ -20,10 +21,6 @@ def fetch_klines(symbol, interval='15m', limit=200):
         data = response.json()
         print(f"ℹ️ API ответ {symbol}: {data}")
 
-        if data.get("retCode") != 0:
-            print(f"❌ API ошибка {symbol}: {data.get('retMsg', 'Unknown')}")
-            return None
-
         candles = data.get("result", {}).get("list", [])
         if not candles:
             print(f"❌ {symbol} ошибка: пустой список свечей")
@@ -32,7 +29,6 @@ def fetch_klines(symbol, interval='15m', limit=200):
         df = pd.DataFrame(candles, columns=[
             'timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'
         ])
-
         df['timestamp'] = pd.to_datetime(df['timestamp'].astype(float), unit='ms')
         df = df.astype({
             'open': float,
@@ -42,9 +38,7 @@ def fetch_klines(symbol, interval='15m', limit=200):
             'volume': float,
             'turnover': float
         })
-
         df.set_index('timestamp', inplace=True)
-        df = df.sort_index()
         return df
 
     except Exception as e:
