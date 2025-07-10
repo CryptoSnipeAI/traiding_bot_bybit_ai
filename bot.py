@@ -1,6 +1,7 @@
 # bot.py
 import os
 import joblib
+import pandas as pd
 from data_fetch import get_klines
 from features import prepare_features as prepare
 from telegram import Update
@@ -21,11 +22,15 @@ def analyze(symbol, model):
         if df.empty:
             raise ValueError("Features are empty")
 
-        # Удаляем только служебные столбцы, оставляя все признаки
-        drop_cols = ['timestamp', 'future_max', 'return', 'target']
-        features = [col for col in df.columns if col not in drop_cols]
+        # Убираем ненужные столбцы
+        drop_cols = ['timestamp', 'open', 'high', 'low', 'turnover', 'future_max', 'return', 'target']
+        feature_columns = [col for col in df.columns if col not in drop_cols]
 
-        last = df[features].iloc[[-1]].values
+        # Последняя строка фичей
+        last = df[feature_columns].iloc[[-1]]
+        if last.shape[1] != model.n_features_in_:
+            raise ValueError(f"Feature shape mismatch, expected: {model.n_features_in_}, got: {last.shape[1]}")
+
         pred = model.predict(last)[0]
         prob = model.predict_proba(last)[0][pred]
         entry = df['close'].iloc[-1]
