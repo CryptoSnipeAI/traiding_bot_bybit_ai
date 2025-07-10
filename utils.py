@@ -1,12 +1,13 @@
 import pandas as pd
 import requests
 import time
+from datetime import datetime
 
-def fetch_klines(symbol, interval='15', limit=200):
+def fetch_klines(symbol, interval='15m', limit=200):
     url = "https://api.bybit.com/v5/market/kline"
 
     params = {
-        "category": "linear",  # Фьючерсы
+        "category": "linear",  # фьючерсы
         "symbol": symbol,
         "interval": interval,
         "limit": limit
@@ -29,8 +30,15 @@ def fetch_klines(symbol, interval='15', limit=200):
             'timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'
         ])
 
-        # Преобразуем типы данных
+        # Преобразуем
         df['timestamp'] = pd.to_datetime(df['timestamp'].astype(float), unit='ms')
+        now = pd.Timestamp.utcnow()
+        df = df[df['timestamp'] <= now]  # убираем свечи из будущего
+
+        if df.empty:
+            print(f"❌ {symbol} ошибка: пустой DataFrame после фильтрации времени")
+            return None
+
         df = df.astype({
             'open': float,
             'high': float,
