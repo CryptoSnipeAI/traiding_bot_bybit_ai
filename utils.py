@@ -1,12 +1,13 @@
 import pandas as pd
 import requests
-import time
+from datetime import datetime, timedelta
 
 def fetch_klines(symbol, interval='15', limit=200):
     url = "https://api.bybit.com/v5/market/kline"
 
-    # ⚠️ Текущее время минус 5 минут
-    end = int((time.time() - 300) * 1000)
+    # ⏱️ Устанавливаем `end` как текущее UTC время - 5 минут
+    now = datetime.utcnow() - timedelta(minutes=5)
+    end = int(now.timestamp() * 1000)
 
     params = {
         "category": "linear",
@@ -43,5 +44,4 @@ def fetch_klines(symbol, interval='15', limit=200):
 
     except Exception as e:
         print(f"❌ Ошибка запроса {symbol}: {e}")
-        time.sleep(1)
         return None
