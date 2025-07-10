@@ -45,7 +45,7 @@ for symbol in TOP_SYMBOLS:
         df = prepare_target(df)
         X = df[[
             "rsi", "stoch_rsi", "ema20", "ema50", "macd", "macd_signal",
-            "atr", "volatility", "obv", "volume"
+            "atr", "volatility", "volume"
         ]]
         y = df["target"]
         all_X.append(X)
