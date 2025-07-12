@@ -19,17 +19,16 @@ def analyze(symbol, model):
     try:
         df = get_klines(symbol, limit=500)
         df, _ = prepare(df)
-        if df.empty:
-            raise ValueError("Features are empty")
+        if df is None or df.empty:
+            raise ValueError("❌ Dataframe пустой после обработки")
 
         # Убираем ненужные столбцы
         drop_cols = ['timestamp', 'open', 'high', 'low', 'turnover', 'future_max', 'return', 'target']
         feature_columns = [col for col in df.columns if col not in drop_cols]
 
-        # Последняя строка фичей
         last = df[feature_columns].iloc[[-1]]
         if last.shape[1] != model.n_features_in_:
-            raise ValueError(f"Feature shape mismatch, expected: {model.n_features_in_}, got: {last.shape[1]}")
+            raise ValueError(f"❌ Feature shape mismatch, expected: {model.n_features_in_}, got: {last.shape[1]}")
 
         pred = model.predict(last)[0]
         prob = model.predict_proba(last)[0][pred]
