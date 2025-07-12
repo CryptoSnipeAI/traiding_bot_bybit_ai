@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 def fetch_klines(symbol, interval='15', limit=200):
     url = "https://api.bybit.com/v5/market/kline"
 
-    # ⏱️ Устанавливаем `end` как текущее UTC время - 5 минут
     now = datetime.utcnow() - timedelta(minutes=5)
     end = int(now.timestamp() * 1000)
 
