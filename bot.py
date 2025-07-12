@@ -17,18 +17,21 @@ model = joblib.load("model.pkl")
 
 def analyze(symbol, model):
     try:
+        print(f"📈 Обработка: {symbol}")
         df = get_klines(symbol, limit=500)
-        df, _ = prepare(df)
         if df is None or df.empty:
-            raise ValueError("❌ Dataframe пустой после обработки")
+            raise ValueError("Нет данных с биржи")
 
-        # Убираем ненужные столбцы
+        df = prepare(df)
+        if df is None or df.empty:
+            raise ValueError("Нет фичей после подготовки")
+
         drop_cols = ['timestamp', 'open', 'high', 'low', 'turnover', 'future_max', 'return', 'target']
         feature_columns = [col for col in df.columns if col not in drop_cols]
 
         last = df[feature_columns].iloc[[-1]]
         if last.shape[1] != model.n_features_in_:
-            raise ValueError(f"❌ Feature shape mismatch, expected: {model.n_features_in_}, got: {last.shape[1]}")
+            raise ValueError(f"Feature shape mismatch: expected {model.n_features_in_}, got {last.shape[1]}")
 
         pred = model.predict(last)[0]
         prob = model.predict_proba(last)[0][pred]
@@ -36,7 +39,9 @@ def analyze(symbol, model):
         sl = entry * (0.995 if pred else 1.005)
         tp = entry * (1.01 if pred else 0.99)
         direction = "LONG" if pred else "SHORT"
+
         return f"{symbol}\n{direction} @ {entry:.2f}\nSL {sl:.2f} / TP {tp:.2f}\nConf: {prob*100:.1f}%"
+
     except Exception as e:
         print(f"❌ {symbol} error: {e}")
         return None
@@ -98,3 +103,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
