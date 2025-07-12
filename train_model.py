@@ -17,7 +17,7 @@ data = []
 for symbol in symbols:
     print(f"✅ Загружаю {symbol}")
     try:
-        df = fetch_klines(symbol, interval='15m', limit=1500)
+        df = fetch_klines(symbol, interval='15', limit=1500)
 
         if df is None or df.empty:
             print(f"❌ {symbol} ошибка: пустой DataFrame")
