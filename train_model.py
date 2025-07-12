@@ -1,51 +1,69 @@
 import os
-import pickle
+import joblib
 import pandas as pd
-from features import prepare_features
-from utils import fetch_klines
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
+from features import prepare_features
+from data_fetch import get_klines
+from get_pairs import get_top_pairs
 
-symbols = [
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "MATICUSDT",
-    "LTCUSDT", "TRXUSDT", "LINKUSDT", "BCHUSDT", "XLMUSDT",
-    "ATOMUSDT", "ETCUSDT", "FILUSDT", "ICPUSDT", "HBARUSDT"
-]
+def main():
+    symbols = get_top_pairs()
+    all_features = []
+    all_targets = []
 
-data = []
+    for symbol in symbols:
+        print(f"📈 Обработка: {symbol}")
+        try:
+            df = get_klines(symbol)
+            result = prepare_features(df)
 
-for symbol in symbols:
-    print(f"✅ Загружаю {symbol}")
-    try:
-        df = fetch_klines(symbol, interval='15', limit=1500)
+            # если prepare_features вернул None
+            if result is None:
+                print(f"⚠️ {symbol}: фичи не рассчитаны")
+                continue
 
-        if df is None or df.empty:
-            print(f"❌ {symbol} ошибка: пустой DataFrame")
+            df_feat, target = result
+
+            if df_feat is None or df_feat.empty:
+                print(f"⚠️ {symbol}: нет данных после подготовки")
+                continue
+
+            # Убираем ненужные колонки
+            drop_cols = ['timestamp', 'open', 'high', 'low', 'turnover', 'future_max', 'return', 'target']
+            X = df_feat.drop(columns=[col for col in drop_cols if col in df_feat.columns])
+            y = target if isinstance(target, pd.Series) else df_feat['target']
+
+            all_features.append(X)
+            all_targets.append(y)
+
+        except Exception as e:
+            print(f"❌ Ошибка при обработке {symbol}: {e}")
             continue
 
-        features = prepare_features(df)
+    if not all_features:
+        raise ValueError("Нет данных для обучения. Все тикеры не прошли фильтр.")
 
-        if features is None or features.empty or len(features) < 100:
-            print(f"❌ {symbol} ошибка: недостаточно данных после обработки")
-            continue
+    # Объединяем данные всех монет
+    X_all = pd.concat(all_features)
+    y_all = pd.concat(all_targets)
 
-        data.append(features)
+    # Обучение модели
+    X_train, X_test, y_train, y_test = train_test_split(X_all, y_all, test_size=0.2, random_state=42)
 
-    except Exception as e:
-        print(f"❌ {symbol} ошибка: {e}")
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
 
-if not data:
-    raise ValueError("Нет данных для обучения. Все тикеры не прошли фильтр.")
+    # Оценка модели
+    y_pred = model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    print("📊 Accuracy:", round(acc, 4))
+    print(classification_report(y_test, y_pred))
 
-df_all = pd.concat(data)
+    # Сохраняем модель
+    joblib.dump(model, "model.pkl")
+    print("✅ Модель сохранена: model.pkl")
 
-X = df_all.drop(columns=['target'])
-y = df_all['target']
-
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X, y)
-
-with open("model.pkl", "wb") as f:
-    pickle.dump(model, f)
-
-print("✅ Модель обучена и сохранена как model.pkl")
+if __name__ == "__main__":
+    main()
