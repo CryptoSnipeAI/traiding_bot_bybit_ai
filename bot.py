@@ -22,7 +22,7 @@ def analyze(symbol, model):
         if df is None or df.empty:
             raise ValueError("Нет данных с биржи")
 
-        df = prepare(df)
+        df, _ = prepare(df)
         if df is None or df.empty:
             raise ValueError("Нет фичей после подготовки")
 
