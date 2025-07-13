@@ -1,7 +1,6 @@
 # bot.py
 import os
 import joblib
-import pandas as pd
 from data_fetch import get_klines
 from features import prepare_features as prepare
 from telegram import Update
@@ -47,12 +46,16 @@ def analyze(symbol, model):
         return None
 
 async def signal_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("🚀 Команда /signal получена")
     pairs = get_top_pairs()
+    print(f"🔍 Получены пары: {pairs}")
     best_signal = None
     best_prob = 0
 
     for symbol in pairs:
+        print(f"📊 Анализ: {symbol}")
         signal = analyze(symbol, model)
+        print(f"➡️ Результат: {signal}")
         if signal:
             try:
                 prob_line = signal.split("Conf: ")[-1]
@@ -103,4 +106,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
