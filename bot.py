@@ -1,30 +1,30 @@
 # bot.py
 import os
 import joblib
-from data_fetch import get_klines
-from features import prepare_features as prepare
+import pandas as pd
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import utc
+from data_fetch import get_klines
+from features import prepare_features as prepare
 from get_pairs import get_top_pairs
 
-from dotenv import load_dotenv
-load_dotenv()
-
+# Проверка переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-MODEL_PATH = "model.pkl"
 
-# Проверка на наличие токенов
 if not TELEGRAM_TOKEN or not CHAT_ID:
-    raise ValueError("❌ TELEGRAM_TOKEN или CHAT_ID не установлены в переменных окружения.")
+    print("❌ Ошибка: TELEGRAM_TOKEN или CHAT_ID не заданы в переменных окружения")
+    exit(1)
 
-# Проверка модели
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError("❌ model.pkl не найден. Сначала обучи модель через train_model.py")
-
-model = joblib.load(MODEL_PATH)
+# Загрузка модели
+try:
+    model = joblib.load("model.pkl")
+    print("✅ Модель успешно загружена")
+except Exception as e:
+    print(f"❌ Ошибка загрузки модели: {e}")
+    exit(1)
 
 def analyze(symbol, model):
     try:
@@ -52,7 +52,6 @@ def analyze(symbol, model):
         direction = "LONG" if pred else "SHORT"
 
         return f"{symbol}\n{direction} @ {entry:.2f}\nSL {sl:.2f} / TP {tp:.2f}\nConf: {prob*100:.1f}%"
-
     except Exception as e:
         print(f"❌ {symbol} error: {e}")
         return None
@@ -65,9 +64,8 @@ async def signal_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     best_prob = 0
 
     for symbol in pairs:
-        print(f"📊 Анализ: {symbol}")
         signal = analyze(symbol, model)
-        print(f"➡️ Результат: {signal}")
+        print(f"➡️ {symbol} результат: {signal}")
         if signal:
             try:
                 prob_line = signal.split("Conf: ")[-1]
@@ -84,7 +82,7 @@ async def signal_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет подходящих сигналов")
 
 def send_auto_signal():
-    print("⏱️ Запуск автоанализа...")
+    print("📤 Отправка автоматического сигнала")
     bot = Bot(token=TELEGRAM_TOKEN)
     pairs = get_top_pairs()
     best_signal = None
@@ -92,7 +90,7 @@ def send_auto_signal():
 
     for symbol in pairs:
         signal = analyze(symbol, model)
-        print(f"📊 {symbol} результат: {signal}")
+        print(f"🔁 Авто-анализ: {symbol} -> {signal}")
         if signal:
             try:
                 prob_line = signal.split("Conf: ")[-1]
@@ -104,12 +102,12 @@ def send_auto_signal():
                 print(f"❌ Prob parsing error: {e}")
 
     if best_signal:
-        print(f"📤 Отправка сигнала: {best_signal}")
         bot.send_message(chat_id=CHAT_ID, text=best_signal)
     else:
-        print("❌ Нет сигналов для отправки")
+        print("⚠️ Нет подходящих сигналов для отправки")
 
 def main():
+    print("🚀 Запуск бота...")
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("signal", signal_cmd))
 
@@ -117,8 +115,9 @@ def main():
     scheduler.add_job(send_auto_signal, 'interval', minutes=15)
     scheduler.start()
 
-    print("✅ Bot started")
+    print("✅ Бот запущен, ожидает команды...")
     app.run_polling()
 
 if __name__ == "__main__":
     main()
+
