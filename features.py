@@ -6,6 +6,7 @@ from ta.volume import MFIIndicator
 
 def prepare_features(df):
     if df is None or df.empty or len(df) < 100:
+        print("❌ Недостаточно данных для расчёта фичей")
         return None, None
 
     df = df.copy()
@@ -27,7 +28,6 @@ def prepare_features(df):
 
         df['mfi'] = MFIIndicator(high=df['high'], low=df['low'], close=df['close'], volume=df['volume'], window=14).money_flow_index()
 
-        # Целевая переменная: если следующая свеча закрылась выше текущей
         df['target'] = (df['close'].shift(-1) > df['close']).astype(int)
 
         df = df.dropna()
