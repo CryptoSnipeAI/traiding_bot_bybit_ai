@@ -3,16 +3,28 @@ import os
 import joblib
 from data_fetch import get_klines
 from features import prepare_features as prepare
-from telegram import Update
+from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import utc
 from get_pairs import get_top_pairs
 
+from dotenv import load_dotenv
+load_dotenv()
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+MODEL_PATH = "model.pkl"
 
-model = joblib.load("model.pkl")
+# Проверка на наличие токенов
+if not TELEGRAM_TOKEN or not CHAT_ID:
+    raise ValueError("❌ TELEGRAM_TOKEN или CHAT_ID не установлены в переменных окружения.")
+
+# Проверка модели
+if not os.path.exists(MODEL_PATH):
+    raise FileNotFoundError("❌ model.pkl не найден. Сначала обучи модель через train_model.py")
+
+model = joblib.load(MODEL_PATH)
 
 def analyze(symbol, model):
     try:
@@ -72,7 +84,7 @@ async def signal_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет подходящих сигналов")
 
 def send_auto_signal():
-    from telegram import Bot
+    print("⏱️ Запуск автоанализа...")
     bot = Bot(token=TELEGRAM_TOKEN)
     pairs = get_top_pairs()
     best_signal = None
@@ -80,6 +92,7 @@ def send_auto_signal():
 
     for symbol in pairs:
         signal = analyze(symbol, model)
+        print(f"📊 {symbol} результат: {signal}")
         if signal:
             try:
                 prob_line = signal.split("Conf: ")[-1]
@@ -91,7 +104,10 @@ def send_auto_signal():
                 print(f"❌ Prob parsing error: {e}")
 
     if best_signal:
+        print(f"📤 Отправка сигнала: {best_signal}")
         bot.send_message(chat_id=CHAT_ID, text=best_signal)
+    else:
+        print("❌ Нет сигналов для отправки")
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
